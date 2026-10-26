@@ -162,6 +162,23 @@ and `RECIPE_HOME` / `STATE_DIR` customize private runtime paths.
 The model's configuration advertises a **524,288-token positional limit**,
 but **524K was NOT tested or shown to fit** on a single RTX 4090.
 
+### Hugging Face config parsing compatibility
+
+The released model uses **mixed per-tensor EXL3 bits** and has an
+**average decoder-body bitrate of 4.499880554 bpw**. The Hugging Face
+Hub's generic `quantization_config.bits` field expects an integer; putting
+`4.5` there triggered a configuration parsing warning. We therefore
+**omit that field only from top-level `config.json`**, while retaining
+`quant_method: "exl3"`, the original `quantization_config.json` with
+`bits: 4.5` and complete tensor-storage metadata, and the full
+[364-tensor mixed-K allocation](quantization/v6-mixed-k-4.50bpw.yaml).
+
+This is a **metadata/schema compatibility correction**, not a new encode.
+All **54 safetensors weights remain identical** to the qualified model.
+The updated Hub revision and SHA-256 are pinned in
+[`model.lock.json`](model.lock.json), and an exact copy of the public
+[`config.json`](evidence/config.json) is committed as a regression fixture.
+
 ## Quality against BF16 source
 
 | Separate final-logit split | Top-1 agreement | Mean KL |

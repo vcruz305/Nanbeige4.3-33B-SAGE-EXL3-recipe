@@ -53,7 +53,7 @@ bash exllamav3-tabby/download.sh --verify-only
 ~~~
 
 Download is pinned to the public model-card revision
-`aa9628748735f6ae67e48c67a7ed068143b4f656`.
+`32ec2b745dc3f4aa0d2bef84bb97f612e384df23`.
 All 63 files, including **54 safetensors**, have locked SHA-256 and
 size. Default model directory is
 `~/models/Nanbeige4.3-33B-SAGE-EXL3-4.50bpw`.

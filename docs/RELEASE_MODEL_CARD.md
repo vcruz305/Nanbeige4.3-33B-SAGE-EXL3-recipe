@@ -95,6 +95,19 @@ Original-author suggested sampling (for the **base model**, not separately optim
 
 ## SAGE quantization fidelity
 
+### Hugging Face config compatibility
+
+The Hub's generic config parser requires `quantization_config.bits` to be
+an integer. This model uses **mixed per-tensor EXL3 precision**, so the
+nominal **4.5 bpw** figure is an **average**, not a uniform integer width.
+Accordingly, the top-level `config.json` retains
+`quantization_config.quant_method: "exl3"` **without a misleading integer**
+`bits` field. The EXL3-native **`quantization_config.json`** preserves its
+original `bits: 4.5` and packed tensor-storage metadata, and the exact
+achieved **4.499880554 bpw** and 364 tensor allocations are documented in
+the [SAGE quantization recipe](https://github.com/vcruz305/Nanbeige4.3-33B-SAGE-EXL3-recipe).
+**No model weights, layer bit assignments, or tokenizer files were changed.**
+
 This is the original **qualified v6 baseline** at **4.499880554 decoder-body bpw**, with measured mixed-K allocation and an 8-bit embedding/output head. It is **not** the experimental full-residual QAD re-encode.
 
 | BF16 teacher-relative final-logit split | Full-vocabulary top-1 agreement | Mean KL |

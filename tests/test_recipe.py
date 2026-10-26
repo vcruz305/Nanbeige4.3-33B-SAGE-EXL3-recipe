@@ -23,7 +23,7 @@ class ManifestTests(unittest.TestCase):
         self.assertTrue(lock["initial_private_staging"])
         self.assertEqual(lock["current_visibility"], "public")
         self.assertFalse(lock["gated"])
-        self.assertEqual(lock["revision"], "aa9628748735f6ae67e48c67a7ed068143b4f656")
+        self.assertEqual(lock["revision"], "32ec2b745dc3f4aa0d2bef84bb97f612e384df23")
 
     def test_checksum_helper(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -95,6 +95,25 @@ class ManifestTests(unittest.TestCase):
         self.assertEqual(sum(v["total"] for v in cat.values()), 120)
         self.assertEqual(scores["sixcat"]["truncated_code_generations"], 2)
         self.assertTrue(scores["speed_comparison_not_strict_apples_to_apples"])
+
+    def test_hf_config_integer_schema_compatibility(self):
+        # EXL3 is mixed-K, 4.5bpw is a nominal *average*. Do not round it
+        # to 4 or 5 to satisfy the Hub's generic integer-only `bits` schema.
+        config_path = ROOT / "evidence" / "config.json"
+        config = json.loads(config_path.read_text())
+        q = config["quantization_config"]
+        self.assertEqual(q["quant_method"], "exl3")
+        self.assertEqual(q["codebook"], "mul1")
+        self.assertEqual(q["head_bits"], 8)
+        self.assertNotIn("bits", q)
+        lock = json.loads((ROOT / "model.lock.json").read_text())
+        record = next(f for f in lock["files"] if f["path"] == "config.json")
+        self.assertEqual(record["size"], config_path.stat().st_size)
+        self.assertEqual(record["sha256"], hashlib.sha256(config_path.read_bytes()).hexdigest())
+        text = (ROOT / "docs" / "RELEASE_MODEL_CARD.md").read_text()
+        self.assertIn("integer", text)
+        self.assertIn("quantization_config.json", text)
+        self.assertIn("4.499880554", text)
 
     def test_model_access_is_public_and_card_explains_base_model(self):
         lock = json.loads((ROOT / "model.lock.json").read_text())
