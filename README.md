@@ -18,8 +18,10 @@ contains scripts/docs/quality evidence, while the weights reside on Hugging Face
 |---|---:|
 | EXL3 decoder body | **4.499880554 bpw** |
 | Serialized model weights | 54 shards, **18.35 GiB** |
-| Full evaluated context | **36,864 tokens, Q4 KV** |
-| Peak VRAM during full Sixcat | **22,584 MiB** |
+| Full **Sixcat-scored** context | **36,864 tokens, Q4 KV** |
+| Largest verified **synthetic retrieval** context | **131,072 tokens (128K), Q2 KV**, CPU-resident input embedding |
+| 128K tested RTX 4090 peak VRAM | **23,220 MiB** (130,542-token prompt, 3/3 markers, **161.055-second** request) |
+| Peak VRAM during full 36K Sixcat | **22,584 MiB** |
 | ExLlamaV3 generated decode | **33.82 tok/s** weighted; 34.94 median |
 | Sixcat v0.8.3, strict / thinking ON | **104 / 120 = 86.67%** |
 | Real locally guarded Python Code | **17 / 20** |
@@ -147,11 +149,37 @@ a fresh installation. No setup command touches a live runtime or starts GPU work
 | `compact` | 8,192 | Q4 | 1 | **Untested capacity option** for other GPUs; may still fail if VRAM is insufficient |
 | **`extended`** | **131,072** | **Q2 K/V (2,2)** | 1 | **3/3 actual long-prompt retrieval smoke on RTX 4090, host input embedding**; not Sixcat |
 
-Run `PROFILE=extended bash exllamav3-tabby/serve.sh` for the newly
-validated **128K smoke-test configuration** on compatible hardware. It
-uses CPU/system RAM for *only the quantized input embedding*; the dense
-4.50-bpw decoder and 2-bit KV cache still run on the GPU. This reduces
-VRAM at the expense of some host-transfer overhead.
+**Runnable 128K / 131,072-token configuration:** once the isolated
+ExLlamaV3 + TabbyAPI runtime has been adopted with `setup.sh` and the
+public weights have been checksum-verified with `download.sh`, launch:
+
+~~~bash
+# The values below match the local RTX 4090 128K test. Adjust available
+# RAM / disk floors only to suit the resources of your own machine.
+GPU_INDEX=0 PROFILE=extended \
+  MAX_SEQ_LEN=131072 CACHE_SIZE=131072 \
+  CACHE_MODE=Q2 EMBEDDING_PLACEMENT=cpu \
+  RAM_MIN_AVAILABLE_GIB=48 ROOT_MIN_FREE_GIB=42 \
+  PORT=8898 bash exllamav3-tabby/serve.sh
+
+# In a separate shell, after the server reports ready:
+PORT=8898 bash exllamav3-tabby/smoke.sh
+~~~
+
+**Shorter equivalent command with portable host-memory defaults:**
+`PROFILE=extended bash exllamav3-tabby/serve.sh`.
+`extended` configures a single batch/sequence, a full **131,072-token
+Q2 K/V cache** and CPU/system RAM for **only the quantized input
+embedding**, while the **same original 4.50-bpw decoder stays on the GPU**.
+The validated test prefilled **130,542 actual native chat-template tokens**,
+recovered **3 of 3 synthetic markers**, used **23,220 MiB peak RTX 4090
+VRAM**, and took **161.055 seconds including prefill and response**. This
+is a retrieval smoke test, not an accredited 128K reasoning benchmark.
+The script checks model file SHA-256 hashes before running, refuses
+other GPU workers, and monitors memory/disk during runtime.
+
+Full setup, examples and comparisons are in
+[bench/context/README.md](bench/context/README.md).
 
 Other presets include `PROFILE=compact` and `PROFILE=long`. Override
 `MAX_SEQ_LEN`, `CACHE_SIZE`, `CACHE_MODE` (`FP16`, `Q2`/`Q3`/`Q4`/`Q6`/`Q8`
@@ -221,6 +249,26 @@ number cannot make 256K fit. The model's metadata 512K limit remains
 unverified for this EXL3 quantization.
 
 See the [detailed context-test evidence and reproducible settings](bench/context/README.md).
+
+### What would 200K cost on one RTX 4090?
+
+**204,800-token full-context Q2 K/V needs exactly 6,500 MiB of KV memory**
+with this ExLlamaV3 implementation. Relative to the measured 128K/Q2
+setup (4,160 MiB KV and 23,220 MiB peak GPU), the additional 2,340 MiB
+projects the existing all-GPU-decoder 4.50-bpw model at **~25,560 MiB**:
+it **would not fit** below our 23,950 MiB VRAM cap without more offloading.
+The model is **33.1B dense with 52 attention layers**, so the KV cache is
+not small even though it already uses only eight KV heads and 2-bit values.
+
+A separate native pinned-memory sanity test preserved **24/24 baseline
+greedy output tokens** after moving the 8-bit output head and five decoder
+blocks to CUDA-addressable host memory, saving roughly **2.38 GiB**. But
+short-prompt decode fell from ~35 tok/s to **~0.36 tok/s**: this is a poor
+daily-serving option. A **new ~3.9-bpw mixed-precision decoder** is worth
+evaluating for *usable* 200K Q2 on 24 GB, but is **only an estimate** (not
+encoded or scored). See the [200K memory math and candidate bitrate
+comparison](bench/context/200K_MEMORY_OPTIONS.md). The original
+**4.50-bpw release and its Sixcat scores remain unchanged**.
 
 The independent [DFlash2 draft-model test](bench/dflash2/README.md)
 using [ProCreations' native ExLlamaV3 DFlash2 draft](https://huggingface.co/ProCreations/Nanbeige4.3-33B-DFlash2/tree/exllamav3)

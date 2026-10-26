@@ -135,6 +135,38 @@ class ManifestTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             recipe.validate_exl3_quant_metadata(top, {**native, "bits":4})
 
+    def test_200k_q2_budget_and_bitrate_tradeoff(self):
+        # The 200K/4.50 case is intentionally rejected by the portable
+        # single-GPU preflight, not reported as a supported default.
+        cfg = recipe.config("extended", env={
+            "MAX_SEQ_LEN":"204800", "CACHE_SIZE":"204800", "CACHE_MODE":"Q2"})
+        self.assertEqual(recipe.kv_storage_mib(cfg), 6500.0)
+        self.assertTrue(recipe.cpu_embedding_enabled("extended", env={}))
+        with self.assertRaisesRegex(RuntimeError,"Safe context budget exceeded"):
+            recipe.gpu_vram_budget(cfg, cpu_embedding=True,
+                weight_bytes=19700587306, total_mib=24564)
+        body_params=30725373952
+        original_bpw=4.499880554228381
+        def estimate_for(target_bpw):
+            savings=round((original_bpw-target_bpw)*body_params/8)
+            predicted_bytes=19700587306-savings
+            predicted_peak_mib=23220+6500-4160-savings/1048576
+            return savings,predicted_bytes,predicted_peak_mib
+        saved_4,_,peak_4=estimate_for(4.0)
+        self.assertEqual(round(saved_4/1048576),1831)
+        self.assertEqual(round(peak_4),23729)
+        saved_39,bytes_39,peak_39=estimate_for(3.9)
+        self.assertEqual(round(saved_39/1048576),2197)
+        self.assertEqual(round(peak_39),23363)
+        # Approximate 3.9bpw packing would meet the local preflight,
+        # but the pack must actually be encoded and fidelity-tested.
+        plan=recipe.gpu_vram_budget(cfg,cpu_embedding=True,
+             weight_bytes=bytes_39,total_mib=24564)
+        self.assertGreater(plan["estimated_headroom_mib"],300)
+        self.assertLess(plan["estimated_headroom_mib"],650)
+        self.assertIn("200K_MEMORY_OPTIONS.md",
+             (ROOT/"bench/context/README.md").read_text())
+
     def test_public_context_smoke_receipts_honest(self):
         data=json.loads((ROOT / "bench/context/measured-results.json").read_text())
         tested=data["validated_cases"]
