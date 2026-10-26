@@ -1,0 +1,20 @@
+name: CPU recipe checks
+on:
+  push:
+  pull_request:
+jobs:
+  validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python unit checks (no GPU, no model download)
+        run: python3 -m unittest discover -s tests -v
+      - name: JSON and command preview
+        run: |
+          python3 -m json.tool model.lock.json >/dev/null
+          python3 -m json.tool runtime.json >/dev/null
+          python3 -m json.tool quantization/campaign.json >/dev/null
+          DRY_RUN=1 bash exllamav3-tabby/serve.sh >/dev/null
+      - name: Shell syntax
+        run: |
+          for script in exllamav3-tabby/*.sh quantization/*.sh; do bash -n "$script"; done

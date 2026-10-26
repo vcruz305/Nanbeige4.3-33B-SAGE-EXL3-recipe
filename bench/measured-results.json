@@ -1,0 +1,73 @@
+{
+  "model": "Nanbeige4.3-33B SAGE-EXL3 4.50bpw",
+  "date": "2026-10-26",
+  "gpu": "RTX 4090 24GB",
+  "sixcat": {
+    "version": "v0.8.3",
+    "strict_first_response": true,
+    "thinking": "on",
+    "context_tokens": 36864,
+    "kv": "Q4",
+    "concurrency": 1,
+    "guarded_local_code": true,
+    "scored": 120,
+    "correct": 104,
+    "percent": 86.66667,
+    "by_category": {
+      "knowledge": {
+        "passed": 13,
+        "total": 20
+      },
+      "math": {
+        "passed": 20,
+        "total": 20
+      },
+      "truth": {
+        "passed": 17,
+        "total": 20
+      },
+      "instruct": {
+        "passed": 19,
+        "total": 20
+      },
+      "code": {
+        "passed": 17,
+        "total": 20
+      },
+      "tools": {
+        "passed": 18,
+        "total": 20
+      }
+    },
+    "truncated_code_generations": 2,
+    "caveat": "Two Code completions exhausted 32768 output tokens; scored as failures. Cannot compare as fully untruncated."
+  },
+  "fidelity_vs_bf16": {
+    "heldout": {
+      "top1": 0.966015625,
+      "mean_kl": 0.01360183795
+    },
+    "independent": {
+      "top1": 0.96171875,
+      "mean_kl": 0.01057153137
+    }
+  },
+  "performance": {
+    "exllamav3_tabby_q4_36k": {
+      "decode_tps_weighted": 33.8207,
+      "decode_tps_median": 34.94,
+      "long_request_count": 107,
+      "server_reported": true,
+      "peak_gpu_mib": 22584
+    },
+    "vllm_0_32_plugin_int4_36k": {
+      "sse_post_first_token_256_mean_tps": 6.8373,
+      "matched_prompts": false,
+      "cuda_graphs": false,
+      "source": "vLLM isolated local speed.json"
+    }
+  },
+  "selected_engine": "ExLlamaV3",
+  "speed_comparison_not_strict_apples_to_apples": true,
+  "no_public_weights": true
+}

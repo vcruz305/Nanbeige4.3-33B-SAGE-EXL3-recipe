@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "tested_engine": "ExLlamaV3 through TabbyAPI",
+  "tested_exllamav3_repo": "https://github.com/vcruz305/exllamav3",
+  "tested_exllamav3_commit": "61cfd2cbed196cb05e512ac2201c7f1711140ada",
+  "tested_exllamav3_remote_availability": "local development commit, NOT confirmed fetchable from published fork at recipe creation; exact runtime qualification applies only to existing validated checkout",
+  "tested_tabbyapi_repo": "https://github.com/vcruz305/tabbyAPI",
+  "tested_tabbyapi_base_commit": "fcc1a1078e1f766dad305045c7c4d30aaefa6458",
+  "tabby_api_patch": "The isolated benchmark Tabby copy had a Turing sm75 hardware capability exception in common/hardware.py. This is NOT needed on the RTX4090 sm89.",
+  "cache_mode": "Q4",
+  "context_tokens": 36864,
+  "max_batch_size": 1,
+  "chunk_size": 512,
+  "cuda_embedding_env": "EXL3_EMBED_TABLE_CUDA=1",
+  "CUDA_graphs": false,
+  "quantized_weight_files": 54,
+  "qualification": "Only original pinned environment validated. Installing current upstream or fork revisions does NOT replicate measured speed or Sixcat score by assertion."
+}

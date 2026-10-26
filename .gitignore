@@ -1,0 +1,22 @@
+# No model files, tokens, logs, caches, or machine-local receipts
+.state/
+.venv/
+__pycache__/
+*.py[cod]
+*.log
+*.pid
+*.lock
+config.preview.yml
+models/
+*.safetensors
+*.pt
+*.pth
+*.bin
+hf_home/
+hf-cache/
+.env
+.env.*
+api_tokens.yml
+results/
+*.tmp
+.DS_Store
