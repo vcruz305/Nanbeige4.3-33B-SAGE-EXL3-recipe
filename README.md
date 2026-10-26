@@ -1,16 +1,19 @@
-# Nanbeige4.3-33B SAGE-EXL3 4.50 bpw — one RTX 4090
+# Nanbeige4.3-33B SAGE-EXL3 4.50 bpw — model and serving recipe
 
 Run **Nanbeige4.3-33B**, a **33B dense** model, at **4.499880554 body bpw**
-on one 24 GB NVIDIA RTX 4090 using **ExLlamaV3 + TabbyAPI**. This is
-the actual qualified v6 SAGE allocation, with measured 36,864-token
-context, **Q4 KV**, full strict Sixcat results, private-model checksums,
-and the exact per-tensor mixed-K quantization allocation.
+on compatible NVIDIA CUDA systems with enough VRAM, using
+**ExLlamaV3 + TabbyAPI**. This is the original qualified v6 SAGE
+allocation, including the exact per-tensor mixed-K configuration, private
+release checksums, and reproducible serving scripts. It is **not limited
+to the RTX 4090**. The following benchmark results were **measured on a
+single RTX 4090**; other GPUs and operating environments need independent
+memory/throughput/compatibility validation.
 
 **Model:** [vcruz305/Nanbeige4.3-33B-SAGE-EXL3-4.50bpw](https://huggingface.co/vcruz305/Nanbeige4.3-33B-SAGE-EXL3-4.50bpw)
 — **PRIVATE.** Access is required; this public GitHub recipe **does not**
 grant access, include weights, or change the model's visibility.
 
-| One local RTX 4090, verified 2026-10-26 | Measured result |
+| Actual results — **RTX 4090** test machine, 2026-10-26 | Measurement |
 |---|---:|
 | EXL3 decoder body | **4.499880554 bpw** |
 | Serialized model weights | 54 shards, **18.35 GiB** |
@@ -39,12 +42,19 @@ result is **not directly comparable to a fully untruncated run**.
 
 ## Quick start
 
-Linux/WSL2 with an RTX 4090, local CUDA-enabled Python with a working
-ExLlamaV3 installation, and an isolated TabbyAPI source checkout.
+Linux/WSL2 with a compatible NVIDIA CUDA GPU, CUDA-enabled Python with
+a working ExLlamaV3 installation, and an isolated TabbyAPI checkout.
+The packed weights alone require **18.35 GiB VRAM**; additional memory
+is needed for the model runtime and KV cache. A single GPU with at least
+24 GiB VRAM is a **practical starting point, not a universal guarantee**.
+A multi-GPU machine can select one GPU with `GPU_INDEX`, but **sharding,
+CPU offload, CPU-only operation and non-CUDA backends are not configured
+or validated by this particular script**. The original benchmarks were
+measured exclusively on an RTX 4090.
 
 ~~~bash
-git clone https://github.com/vcruz305/Nanbeige4.3-33B-SAGE-EXL3-RTX-4090-recipe.git
-cd Nanbeige4.3-33B-SAGE-EXL3-RTX-4090-recipe
+git clone https://github.com/vcruz305/Nanbeige4.3-33B-SAGE-EXL3-recipe.git
+cd Nanbeige4.3-33B-SAGE-EXL3-recipe
 
 # 1. Existing isolated CUDA + ExLlamaV3 + TabbyAPI runtime
 export BASE_PYTHON=/path/to/your/cuda-venv/bin/python
@@ -60,7 +70,7 @@ bash exllamav3-tabby/download.sh
 # 3. Verify configuration without using GPU
 DRY_RUN=1 PROFILE=long bash exllamav3-tabby/serve.sh
 
-# 4. Load on an IDLE RTX 4090 with an owned-process GPU safety guard
+# 4. Serve on your selected idle compatible CUDA GPU, with a safety guard
 PROFILE=long bash exllamav3-tabby/serve.sh
 
 # In a separate terminal:
@@ -74,18 +84,26 @@ Current public checkouts are **not automatically score- or speed-qualified**.
 Read [installation and provenance](docs/installation.md) before building
 a fresh installation. No setup command touches a live runtime or starts GPU work.
 
-## Profiles
+## Profiles and hardware-independent configuration
 
 | Profile | Context | KV cache | Batch | Status |
 |---|---:|---|---:|---|
-| `long` (default) | **36,864** | **Q4** | 1 | **Full Sixcat validated** |
-| `short` | 16,384 | Q8 | 1 | Measured smoke, **not enough for full thinking-enabled Sixcat Code** |
+| `long` (default) | **36,864** | **Q4** | 1 | **Full Sixcat measured on RTX 4090** |
+| `short` | 16,384 | Q8 | 1 | Separate **RTX 4090** smoke; not enough for long thinking-enabled Sixcat Code |
+| `compact` | 8,192 | Q4 | 1 | **Untested capacity option** for other GPUs; may still fail if VRAM is insufficient |
 
-Run `PROFILE=short bash exllamav3-tabby/serve.sh` to use the short profile.
-`MODEL_DIR` overrides the default local model folder,
-`PORT` overrides the loopback API port (default 8898),
-`RECIPE_HOME` and `STATE_DIR` customize local state paths.
-`GPU_LOCK_FILE` can point to a shared exclusive lock.
+Select profiles using `PROFILE=compact bash exllamav3-tabby/serve.sh` or
+`PROFILE=long`. On hardware with different memory budgets, change
+`MAX_SEQ_LEN`, `CACHE_SIZE`, and `CACHE_MODE` (`FP16`/`Q8`/`Q6`/`Q4`) for
+**new unvalidated deployments** (e.g. `MAX_SEQ_LEN=65536 CACHE_MODE=Q8`).
+The script requires KV cache size ≥ context and a multiple of 256 tokens.
+These overrides **do not inherit** the measured 4090 speed, fit, or score.
+
+`GPU_INDEX=1` selects the second installed NVIDIA GPU on a multi-GPU host
+(the script uses exactly that device, not all GPUs). `MODEL_DIR` overrides
+the private local checkpoint, `PORT` sets loopback API port (default 8898),
+and `RECIPE_HOME` / `STATE_DIR` customize private runtime paths.
+`GPU_LOCK_FILE` allows coordination with other cooperative workers.
 
 The model's configuration advertises a **524,288-token positional limit**,
 but **524K was NOT tested or shown to fit** on a single RTX 4090.
@@ -166,9 +184,15 @@ claim of a byte-identical fresh quantization.
 
 Serving binds **127.0.0.1 only**, without authentication as in the
 measured local benchmark. **Do not expose this API on a public interface.**
-A single-worker preflight refuses an occupied GPU; the watchdog protects
-23,950 MiB maximum GPU memory, 48 GiB available host RAM and 42 GiB free
-root disk, and can signal only its own child process group.
+A single-worker preflight refuses an occupied selected GPU; the watchdog
+reserves at least **2.5% of that GPU's VRAM or 614 MiB**, whichever is
+larger, and can signal only its own child process group. On the original
+24,564-MiB RTX 4090 this yields **23,949 MiB maximum**, slightly below
+the measured 23,950-MiB safety cutoff. Portable default available-RAM/root-
+disk safety floors are **8 GiB / 4 GiB**; tighten them with
+`RAM_MIN_AVAILABLE_GIB` and `ROOT_MIN_FREE_GIB`. The **original benchmark
+campaign** used 48 GiB available-RAM and 42 GiB disk safety floors.
+No other CUDA devices are modified.
 
 Original model: Nanbeige Team; EXL3: Turboderp and collaborators;
 TabbyAPI: The Royal Lab; SAGE-EXL3 quant and this recipe: Victor Cruz.

@@ -1,6 +1,7 @@
 # Benchmarks and limitations
 
-Metrics from the completed RTX 4090 run are preserved in
+This model recipe can be used on other compatible CUDA GPUs, but
+**all benchmark numbers below are from the original RTX 4090**, preserved in
 [`measured-results.json`](measured-results.json). This repo deliberately
 excludes raw challenge prompts, full inference transcripts and
 private model files.
@@ -16,7 +17,7 @@ scoring flags (port and model name adjusted for this recipe):
 python -m sixcat \
   --base-url http://127.0.0.1:8898/v1 \
   --model Nanbeige4.3-33B-SAGE-EXL3-4.50bpw \
-  --artifact-id Nanbeige43-v6-4.50bpw-4090-36k-q4 \
+  --artifact-id Nanbeige43-v6-4.50bpw-new-device-36k-q4 \
   --policy strict --thinking on --limit 20 --concurrency 1 \
   --max-minutes 0 --ctx 36864 --request-timeout 3600 \
   --out ./nanbeige-sixcat-v083-full.json --no-resume

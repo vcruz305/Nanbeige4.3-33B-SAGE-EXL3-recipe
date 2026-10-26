@@ -47,7 +47,7 @@ If you possess its dependencies and original locally licensed data:
 export SAGE_CAMPAIGN_ROOT=/path/to/SAGE-EXL3-nanbeige43-33b-4090
 bash quantization/run-stages.sh preflight
 bash quantization/run-stages.sh status
-# Only after the source and all four splits are ready, and RTX4090 is idle:
+# Only after source/corpora are ready and the chosen GPU is idle:
 bash quantization/run-stages.sh capture
 bash quantization/run-stages.sh measure-seed
 bash quantization/run-stages.sh measure-pilot

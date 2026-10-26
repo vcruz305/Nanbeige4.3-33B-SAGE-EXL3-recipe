@@ -1,7 +1,12 @@
 # Install and run
 
-Requires Linux/WSL2, NVIDIA RTX 4090 24 GB, compatible CUDA-enabled
-PyTorch, ExLlamaV3 and TabbyAPI, and disk room for the 18.35 GiB pack.
+Requires Linux/WSL2, a compatible NVIDIA CUDA GPU with enough VRAM
+for 18.35 GiB of weights plus inference/KV overhead, CUDA-enabled PyTorch,
+ExLlamaV3 and TabbyAPI. A 24 GiB GPU is a reasonable starting point; it is
+**not a promise every such card can run the tested 36K/Q4 configuration**.
+This recipe can select a GPU on a multi-GPU machine with `GPU_INDEX`,
+but does not configure tensor-parallel splits or CPU layer offload.
+The recorded measurements were all performed on **RTX 4090 24 GB**.
 
 ## Important: locally qualified runtime versus current public checkout
 
@@ -19,9 +24,9 @@ and [TabbyAPI installation guide](https://github.com/theroyallab/tabbyAPI)
 to prepare a separate environment. Example source roots:
 
 ~~~bash
-mkdir -p ~/nanbeige43-exl3-4090/src
-git clone https://github.com/vcruz305/exllamav3.git ~/nanbeige43-exl3-4090/src/exllamav3
-git clone https://github.com/vcruz305/tabbyAPI.git ~/nanbeige43-exl3-4090/src/tabbyAPI
+mkdir -p ~/nanbeige43-exl3/src
+git clone https://github.com/vcruz305/exllamav3.git ~/nanbeige43-exl3/src/exllamav3
+git clone https://github.com/vcruz305/tabbyAPI.git ~/nanbeige43-exl3/src/tabbyAPI
 # Build/install them in a fresh CUDA-enabled Python env using their docs.
 # This newly built environment is UNQUALIFIED until a local smoke and eval.
 ~~~
@@ -65,10 +70,21 @@ bash exllamav3-tabby/smoke.sh
 
 `long`: 36,864-token context Q4 KV, batch1, chunk512.
 `short`: 16,384-token context Q8 KV, batch1.
+`compact`: 8,192-token context Q4 KV, batch1 (**experimental**,
+not a confirmed fit on a specific other GPU).
 `PORT` defaults to 8898. API **always** binds 127.0.0.1.
-Resource checks refuse a busy 4090 and enforce GPU <=23,950 MiB,
-available host RAM >=48 GiB, root disk >=42 GiB, and a cooperative
-exclusive lock. Only the child process group launched by this recipe
-can be stopped by its watcher. Quit with Ctrl-C.
+Resource checks refuse an occupied selected NVIDIA GPU and reserve at
+least 2.5% of its VRAM or 614 MiB, whichever is greater. On the measured
+RTX 4090 (24,564 MiB), this preserves a 23,949-MiB limit. Portable
+default RAM/disk safety floors are 8/4 GiB free and can be raised via
+`RAM_MIN_AVAILABLE_GIB` / `ROOT_MIN_FREE_GIB`. The original scoring
+campaign used stricter 48/42 GiB floors. Only the owned model-server
+process group may be stopped by this launcher. Quit with Ctrl-C.
+
+To select a different GPU: `GPU_INDEX=1 PROFILE=compact bash
+exllamav3-tabby/serve.sh` (only a configuration example, **not a
+verified 8K fit** on that GPU). Larger devices can experimentally adjust
+`MAX_SEQ_LEN`, `CACHE_SIZE`, or `CACHE_MODE`; record new benchmarks.
+Non-NVIDIA and CPU-only inference are outside this EXL3 runtime recipe.
 
 `DRY_RUN=1` does not touch the GPU or install any packages.

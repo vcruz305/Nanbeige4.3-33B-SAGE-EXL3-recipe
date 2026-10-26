@@ -14,5 +14,26 @@
   "cuda_embedding_env": "EXL3_EMBED_TABLE_CUDA=1",
   "CUDA_graphs": false,
   "quantized_weight_files": 54,
-  "qualification": "Only original pinned environment validated. Installing current upstream or fork revisions does NOT replicate measured speed or Sixcat score by assertion."
+  "qualification": "Only original pinned environment validated. Installing current upstream or fork revisions does NOT replicate measured speed or Sixcat score by assertion.",
+  "hardware_requirements": "Compatible NVIDIA CUDA GPU with enough VRAM for 18.35GiB weights and runtime/KV; not limited to RTX4090; actual benchmark tested only RTX4090",
+  "portable_single_gpu_select": "GPU_INDEX (NVIDIA physical index; child CUDA_VISIBLE_DEVICES set to selection)",
+  "portable_profiles": {
+    "long": {
+      "context": 36864,
+      "kv": "Q4",
+      "tested_on": "RTX4090"
+    },
+    "short": {
+      "context": 16384,
+      "kv": "Q8",
+      "tested_on": "RTX4090"
+    },
+    "compact": {
+      "context": 8192,
+      "kv": "Q4",
+      "tested_on": null,
+      "qualification": "experimental"
+    }
+  },
+  "portable_safety": "Guard reserves >=2.5% VRAM or 614 MiB (original RTX4090 24564MiB -> 23949MiB cap); 8GiB available RAM and 4GiB root free by default. Host floors adjustable."
 }
