@@ -20,8 +20,10 @@ class ManifestTests(unittest.TestCase):
         recipe.validate_release_metadata(lock)
         self.assertEqual(lock["shard_count"], 54)
         self.assertEqual(lock["weight_bytes"], 19700587306)
-        self.assertTrue(lock["private_at_release"])
-        self.assertEqual(lock["revision"], "b273927de2b1c93e51f4d25707613cc0c28e3283")
+        self.assertTrue(lock["initial_private_staging"])
+        self.assertEqual(lock["current_visibility"], "public")
+        self.assertFalse(lock["gated"])
+        self.assertEqual(lock["revision"], "aa9628748735f6ae67e48c67a7ed068143b4f656")
 
     def test_checksum_helper(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -93,6 +95,22 @@ class ManifestTests(unittest.TestCase):
         self.assertEqual(sum(v["total"] for v in cat.values()), 120)
         self.assertEqual(scores["sixcat"]["truncated_code_generations"], 2)
         self.assertTrue(scores["speed_comparison_not_strict_apples_to_apples"])
+
+    def test_model_access_is_public_and_card_explains_base_model(self):
+        lock = json.loads((ROOT / "model.lock.json").read_text())
+        self.assertEqual(lock["current_visibility"], "public")
+        self.assertFalse(lock["gated"])
+        self.assertTrue(lock["initial_private_staging"])
+        card = (ROOT / "docs" / "RELEASE_MODEL_CARD.md").read_text()
+        self.assertIn("gated: false", card)
+        self.assertIn("Public, freely downloadable EXL3", card)
+        for expected in ("52", "56 query heads", "8 key/value heads", "524,288",
+                         "Toolathlon-Verified", "preserve_thinking", "Apache-2.0",
+                         "104/120", "RTX 4090", "not EXL3"):
+            self.assertIn(expected.lower(), card.lower())
+        code = (ROOT / "tools" / "recipe.py").read_text()
+        self.assertIn("token=False, max_workers=1", code)
+        self.assertNotIn("Authenticated PRIVATE HF download", code)
 
     def test_qualified_allocation_not_residual_qad(self):
         data = (ROOT / "quantization" / "v6-mixed-k-4.50bpw.yaml").read_text()

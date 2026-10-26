@@ -2,8 +2,8 @@
 
 | Symptom | Verified or safe next action |
 |---|---|
-| HF 401/403 | Model repo remains PRIVATE. Authenticate via `hf auth login` and obtain legitimate access; do not make weights public to bypass it |
-| Shard missing or hash mismatch | Re-download the **locked private revision**, then verify all 63 SHA-256 hashes. Do not delete unrelated files |
+| HF 401/403 | The model is public and ungated. Check the exact model ID, Hub status, any proxy/cache credential interference, and retry anonymously; no access request is required |
+| Shard missing or hash mismatch | Re-download the **locked public revision**, then verify all 63 SHA-256 hashes. Do not delete unrelated files |
 | Sixcat Code HTTP400 “65 pages / 64 available” | 16K cannot handle long reasoning. Use measured **36,864 context Q4 KV** instead, not reduced Code token limits |
 | Q8 at 36K OOM | Not qualified; Q8 **16K** or Q4 **36K** are the measured combinations |
 | GPU VRAM reaches dynamic reserved ceiling | Owned safety watcher stops only the launched model server; it reserves ≥2.5% or 614 MiB, whichever is larger |

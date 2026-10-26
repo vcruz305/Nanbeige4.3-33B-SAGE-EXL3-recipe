@@ -1,8 +1,7 @@
 {
   "schema_version": 1,
   "repo_id": "vcruz305/Nanbeige4.3-33B-SAGE-EXL3-4.50bpw",
-  "revision": "b273927de2b1c93e51f4d25707613cc0c28e3283",
-  "private_at_release": true,
+  "revision": "aa9628748735f6ae67e48c67a7ed068143b4f656",
   "architecture": "LlamaForCausalLM",
   "shard_count": 54,
   "weight_bytes": 19700587306,
@@ -323,5 +322,9 @@
       "sha256": "91f4aec9f1fafb9924659bc3d843130bd3b092418327f31a998156aa07aa44b7"
     }
   ],
-  "origin": "verified local qualified-v6 baseline pack (54 weights checked against private Hub SHA256 on 2026-10-26)"
+  "origin": "verified qualified-v6 pack: 54 model safetensors previously SHA-256 checked against the Hub; later README-only commit did not change weights",
+  "initial_private_staging": true,
+  "current_visibility": "public",
+  "gated": false,
+  "public_release_model_card": "README.md at revision aa9628748735f6ae67e48c67a7ed068143b4f656"
 }

@@ -69,5 +69,7 @@
   },
   "selected_engine": "ExLlamaV3",
   "speed_comparison_not_strict_apples_to_apples": true,
-  "no_public_weights": true
+  "model_repository_visibility": "public",
+  "model_repository_gated": false,
+  "github_repository_contains_weights": false
 }

@@ -4,8 +4,10 @@
   the later full-residual QAD candidate was NOT selected.
 - Never commit model weights, source BF16 checkpoints, private tokenized
   corpora, credentials, user/private conversations, logs or runtime caches.
-- The Hugging Face model remains PRIVATE until separately authorized.
-  Public recipe docs are not permission to publish model shards.
+- The user authorized this EXL3 model's public release; Hugging Face
+  is **public, ungated**, while this GitHub repository holds no weights.
+  Do not revert visibility or change unrelated repositories.
+  Never expose private calibration corpora, credentials or internal traces.
 - Never claim an incomplete Sixcat score, skip Code, disable thinking,
   or repair the first response. Real verified score: 104/120 with two
   Code completions truncated at 32,768 tokens.

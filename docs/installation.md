@@ -40,19 +40,20 @@ export TABBY_DIR=/path/to/tabbyAPI
 bash exllamav3-tabby/setup.sh
 ~~~
 
-## Private model download and integrity validation
+## Public, ungated model download and integrity validation
 
-The private model requires owner access and `hf auth login`:
+The model's 54 EXL3 weight shards are **publicly downloadable without
+an HF account, token, license-acceptance click or access request**.
+The download script explicitly uses anonymous access:
 
 ~~~bash
 python3 -m pip install -U huggingface_hub
-hf auth login
 bash exllamav3-tabby/download.sh
 bash exllamav3-tabby/download.sh --verify-only
 ~~~
 
-Download is pinned to revision
-`b273927de2b1c93e51f4d25707613cc0c28e3283`.
+Download is pinned to the public model-card revision
+`aa9628748735f6ae67e48c67a7ed068143b4f656`.
 All 63 files, including **54 safetensors**, have locked SHA-256 and
 size. Default model directory is
 `~/models/Nanbeige4.3-33B-SAGE-EXL3-4.50bpw`.

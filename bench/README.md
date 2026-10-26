@@ -4,7 +4,8 @@ This model recipe can be used on other compatible CUDA GPUs, but
 **all benchmark numbers below are from the original RTX 4090**, preserved in
 [`measured-results.json`](measured-results.json). This repo deliberately
 excludes raw challenge prompts, full inference transcripts and
-private model files.
+model weights (the weights are available separately on the public,
+ungated Hugging Face model repository).
 
 ## Full Sixcat v0.8.3
 

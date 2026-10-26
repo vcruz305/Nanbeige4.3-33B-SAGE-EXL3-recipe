@@ -2,7 +2,8 @@
 
 - [Nanbeige/Nanbeige4.3-33B](https://huggingface.co/Nanbeige/Nanbeige4.3-33B):
   Nanbeige Team, Apache-2.0 under upstream model metadata. Weights
-  live in a separate PRIVATE Hugging Face repo and are **not** copied here.
+  live in a separate **PUBLIC, UNGATED Hugging Face model repository**
+  and are **not** copied or relicensed here.
 - [ExLlamaV3](https://github.com/turboderp-org/exllamav3):
   Turboderp and contributors, native extension/source retains its license.
 - [TabbyAPI](https://github.com/theroyallab/tabbyAPI):

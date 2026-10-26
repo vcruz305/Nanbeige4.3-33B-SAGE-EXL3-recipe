@@ -302,10 +302,10 @@ def release_download(args):
             from huggingface_hub import snapshot_download
         except ImportError as exc:
             raise RuntimeError("Install huggingface_hub: python3 -m pip install -U huggingface_hub") from exc
-        print("Authenticated PRIVATE HF download; never save tokens in this repo.")
+        print("Downloading PUBLIC ungated Hugging Face release anonymously (no token required).")
         snapshot_download(repo_id=lock["repo_id"], revision=lock["revision"],
                           local_dir=str(MODEL), allow_patterns=[e["path"] for e in lock["files"]],
-                          max_workers=1)
+                          token=False, max_workers=1)
     print("Verifying all 63 files by SHA-256; this reads 18.35 GiB locally.")
     print(json.dumps(verify_model(full_sha=True), indent=2))
 

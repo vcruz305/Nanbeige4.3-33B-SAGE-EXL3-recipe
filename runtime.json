@@ -35,5 +35,7 @@
       "qualification": "experimental"
     }
   },
-  "portable_safety": "Guard reserves >=2.5% VRAM or 614 MiB (original RTX4090 24564MiB -> 23949MiB cap); 8GiB available RAM and 4GiB root free by default. Host floors adjustable."
+  "portable_safety": "Guard reserves >=2.5% VRAM or 614 MiB (original RTX4090 24564MiB -> 23949MiB cap); 8GiB available RAM and 4GiB root free by default. Host floors adjustable.",
+  "model_repository_public": true,
+  "model_repository_gated": false
 }
