@@ -61,3 +61,24 @@ revision `61cfd2cbed196cb05e512ac2201c7f1711140ada`, not yet
 fetchable from the public fork at recipe creation. Do not claim new
 current-fork installations reproduce the original score or speeds.
 See [runtime.json](runtime.json) and [installation](docs/installation.md).
+
+## Subsequent RTX 4090 context smoke tests (not Sixcat)
+
+Actual Q4 **53,248** / 52,728-input, Q3 **65,536** / 65,004-input,
+Q2 **81,920** / 81,405-input, and Q2 **131,072** / 130,542-input tests
+completed full-context prefill and generation with **3/3 synthetic retrieval
+markers**. Peak VRAM was **23,120 / 22,980 / 22,680 / 23,220 MiB**, respectively.
+The 128K mode used a **CPU-resident quantized input embedding**; the
+original decoder remains GPU-resident. Original VRAM cutoff was 23,950 MiB.
+These runs are **not** full Sixcat or general long-context reasoning quality.
+
+A **262,144-token Q2** attempt prepared 261,619 native prompt tokens but
+failed its capacity preflight **before launching a GPU worker**: 8,320 MiB
+of KV payload and estimated 27,576 MiB VRAM against the 23,950 MiB cap.
+Never claim 256K worked on the 4090 with this 4.50-bpw pack.
+See [context receipts and operating instructions](bench/context/README.md).
+
+DFlash2 short native tests: 35.58 -> 42.81 tok/s coding (1.20x) and
+35.57 -> 44.30 tok/s agentic (1.25x) with a separate 1.96GB draft.
+Greedy sequences diverged, so lossless equivalence remains unverified.
+See [DFlash2 measured evidence](bench/dflash2/README.md).

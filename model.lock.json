@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "repo_id": "vcruz305/Nanbeige4.3-33B-SAGE-EXL3-4.50bpw",
-  "revision": "32ec2b745dc3f4aa0d2bef84bb97f612e384df23",
+  "revision": "e4bf35566476daf25fdf650947d10553c1af985c",
   "architecture": "LlamaForCausalLM",
   "shard_count": 54,
   "weight_bytes": 19700587306,
@@ -326,6 +326,7 @@
   "initial_private_staging": true,
   "current_visibility": "public",
   "gated": false,
-  "public_release_model_card": "README.md at revision aa9628748735f6ae67e48c67a7ed068143b4f656",
-  "schema_compatibility_note": "Hugging Face config.json omits fractional quantization_config.bits to meet integer-only generic schema; EXL3-native quantization_config.json retains bits=4.5 and tensor_storage; mixed-K weights unchanged"
+  "public_release_model_card": "README.md at revision e4bf35566476daf25fdf650947d10553c1af985c",
+  "schema_compatibility_note": "Hugging Face config.json omits fractional quantization_config.bits to meet integer-only generic schema; EXL3-native quantization_config.json retains bits=4.5 and tensor_storage; mixed-K weights unchanged",
+  "latest_model_card_notes": "128K Q2 KV / CPU input embedding smoke 3-of-3 passed on RTX4090; 256K Q2 safety preflight rejected, no GPU run; experimental DFlash2 not lossless"
 }

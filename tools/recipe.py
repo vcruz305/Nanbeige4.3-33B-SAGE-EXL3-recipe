@@ -12,6 +12,8 @@ import hashlib
 import json
 import math
 import os
+import re
+import resource
 from pathlib import Path
 import shutil
 import signal
@@ -40,6 +42,7 @@ PROFILES = {
     "long": {"context": 36864, "cache": "Q4", "status": "measured_on_RTX4090"},
     "short": {"context": 16384, "cache": "Q8", "status": "measured_on_RTX4090"},
     "compact": {"context": 8192, "cache": "Q4", "status": "experimental_other_GPUs"},
+    "extended": {"context": 131072, "cache": "Q2", "status": "RTX4090_128K_Q2_CPU_embedding_3of3_retrieval_smoke"},
 }
 
 
@@ -87,6 +90,24 @@ def sha256_file(path: Path):
     return dig.hexdigest()
 
 
+def validate_exl3_quant_metadata(top_level: dict, native: dict):
+    """EXL3 average mixed bitrate is a float in the native sidecar, not the
+    generic Hub quantization_config.bits integer field. Accept both legacy
+    local floats and the corrected public top-level config; never round.
+    """
+    if top_level.get("quant_method") != "exl3" or top_level.get("codebook") != "mul1":
+        raise ValueError("Expected the EXL3 mul1 quantization method")
+    if "bits" in top_level and float(top_level["bits"]) != 4.5:
+        raise ValueError("Unexpected legacy bits field in top-level config")
+    if native.get("quant_method") != "exl3" or native.get("codebook") != "mul1":
+        raise ValueError("Native EXL3 sidecar quantization method mismatch")
+    if float(native.get("bits", 0)) != 4.5 or int(native.get("head_bits", 0)) != 8:
+        raise ValueError("Native EXL3 mixed-K bitrate/head precision mismatch")
+    if not isinstance(native.get("tensor_storage"), dict) or not native["tensor_storage"]:
+        raise ValueError("Missing EXL3 per-tensor storage information")
+    return True
+
+
 def verify_model(model_dir: Path = MODEL, *, full_sha: bool = True, lock=None):
     lock = lock or read_json(LOCK)
     validate_release_metadata(lock)
@@ -109,8 +130,8 @@ def verify_model(model_dir: Path = MODEL, *, full_sha: bool = True, lock=None):
     q = cfg.get("quantization_config", {})
     if cfg.get("architectures") != ["LlamaForCausalLM"] or cfg.get("num_hidden_layers") != 52:
         raise ValueError("Not the expected 52-layer Nanbeige model")
-    if q.get("quant_method") != "exl3" or float(q.get("bits", 0)) != 4.5 or q.get("codebook") != "mul1":
-        raise ValueError("Not the selected 4.50bpw EXL3 release")
+    native = read_json(model_dir / "quantization_config.json")
+    validate_exl3_quant_metadata(q, native)
     if not (model_dir / "tokenizer_config.json").is_file():
         raise ValueError("Missing native tokenizer/chat template")
     return {"files": len(expected), "shards": len(expected_shards), "shard_bytes": lock["weight_bytes"], "sha256_checked": full_sha}
@@ -136,8 +157,12 @@ def config(profile: str = "long", *, model_dir: Path = MODEL, port: int = 8898, 
         raise ValueError("MAX_SEQ_LEN must be a multiple of 256 between 256 and 524288")
     if cache < seq or cache > 524288 or cache % 256:
         raise ValueError("CACHE_SIZE must cover MAX_SEQ_LEN and be a multiple of 256 up to 524288")
-    if mode not in ("FP16", "Q8", "Q6", "Q4"):
-        raise ValueError("CACHE_MODE must be one of FP16, Q8, Q6, Q4")
+    # TabbyAPI names Q4/Q6/Q8 and accepts native per-K,V bit pairs,
+    # e.g. "2,2" or "3,3"; the aliases Q2/Q3 are our recipe convenience.
+    alias = {"Q2": "2,2", "Q3": "3,3"}
+    mode = alias.get(mode, mode)
+    if mode not in ("FP16", "Q8", "Q6", "Q4") and not re.fullmatch(r"[2-8],[2-8]", mode):
+        raise ValueError("CACHE_MODE: FP16, Q2/Q3/Q4/Q6/Q8, or K,V with 2..8 bits")
     return {
         "network": {
             "host": "127.0.0.1", "port": port, "disable_auth": True,
@@ -178,6 +203,65 @@ def gpu_binary():
     if not found:
         raise RuntimeError("nvidia-smi missing")
     return found
+
+
+def cpu_embedding_enabled(profile: str, env=None) -> bool:
+    """Default GPU-resident embeddings except in measured 128K profile.
+    A user can select CPU or GPU without modifying model weights.
+    """
+    if env is None:
+        env = os.environ
+    if profile not in PROFILES:
+        raise ValueError("Unknown profile")
+    placement = env.get("EMBEDDING_PLACEMENT", "cpu" if profile == "extended" else "gpu").lower()
+    if placement not in ("gpu", "cpu"):
+        raise ValueError("EMBEDDING_PLACEMENT must be cpu or gpu")
+    return placement == "cpu"
+
+
+def kv_storage_mib(cfg: dict) -> float:
+    """Exact capacity of the per-layer K/V *payload* and 16-bit scales.
+    Shapes: 52 layers, 8 KV heads, 128 dims, 32-element quant groups.
+    Allocated for max cache size; zero-cost virtual context is NOT assumed.
+    """
+    mod = cfg["model"]
+    tokens = int(mod["cache_size"])
+    mode = mod["cache_mode"]
+    if mode == "FP16":
+        bytes_per_token = 52 * (2 * 8 * 128 * 2)
+    else:
+        pair = {"Q4": (4, 4), "Q6": (6, 6), "Q8": (8, 8)}
+        kb, vb = pair[mode] if mode in pair else tuple(int(x) for x in mode.split(","))
+        words = (8 * 128) // 32
+        bytes_per_token = 52 * (words * (kb + vb) * 4 + 2 * words * 2)
+    return tokens * bytes_per_token / (1024 * 1024)
+
+
+def gpu_vram_budget(cfg: dict, *, cpu_embedding: bool, weight_bytes: int,
+                    total_mib: int, used_mib: int = 0) -> dict:
+    """Fail-closed RTX4090-calibrated estimate, NOT a fit guarantee.
+
+    Measured Q2 128K host-embedding: 23220 MiB peak with 4160 MiB KV.
+    Measured Q4 36K all-on-GPU: 22584 MiB peak with 2106 MiB KV.
+    We deliberately overpredict both settings and reserve extra headroom.
+    """
+    cap = gpu_memory_limit_mib(total_mib)
+    weights_mib = math.ceil(weight_bytes / (1024 * 1024))
+    kv_mib = kv_storage_mib(cfg)
+    # These are conservatively rounded measured weight+runtime overheads;
+    # devices/kernels differ and still require the runtime safety watcher.
+    overhead_mib = 450 if cpu_embedding else 1750
+    predicted = math.ceil(weights_mib + kv_mib + overhead_mib)
+    if predicted + 300 >= cap:
+        raise RuntimeError(
+            f"Safe context budget exceeded: estimated {predicted} MiB + 300 MiB "
+            f"headroom vs GPU limit {cap} MiB. "
+            "Do not launch; reduce context/KV or use real CPU/model offload "
+            "or a larger GPU. This recipe cannot automatically offload dense layers."
+        )
+    return {"estimated_peak_mib": predicted, "kv_cache_mib": round(kv_mib, 2),
+            "gpu_limit_mib": cap, "estimated_headroom_mib": cap - predicted,
+            "cpu_embedding": cpu_embedding, "measured_on_other_hardware": False}
 
 
 def gpu_index():
@@ -348,10 +432,14 @@ def serve(args):
             raise RuntimeError("GPU lock is busy; no overlapping model worker allowed")
         with socket.socket() as sock:
             sock.bind(("127.0.0.1", args.port))
+        cfg = config(args.profile, model_dir=MODEL, port=args.port)
+        host_embedding = cpu_embedding_enabled(args.profile)
         initial = safe_resources(before_load=True)
+        budget = gpu_vram_budget(cfg, cpu_embedding=host_embedding,
+                                 weight_bytes=read_json(LOCK)["weight_bytes"],
+                                 total_mib=gpu_info()["total_mib"], used_mib=initial)
         run = STATE / ("run-" + time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()) + "-" + str(os.getpid()))
         run.mkdir(mode=0o700, parents=True, exist_ok=False)
-        cfg = config(args.profile, model_dir=MODEL, port=args.port)
         cfgfile = run / "config.yml"
         cfgfile.write_text(yaml_from_mapping(cfg), encoding="utf8")
         cfgfile.chmod(0o600)
@@ -359,6 +447,8 @@ def serve(args):
             "model": MODEL_ID, "model_revision": read_json(LOCK)["revision"],
             "profile": args.profile, "runtime": metadata, "verification": result,
             "before_load_gpu_mib": initial,
+            "vram_preflight": budget,
+            "cpu_embedding": host_embedding,
             "selected_gpu": gpu_info(),
             "gpu_vram_limit_mib": gpu_memory_limit_mib(gpu_info()["total_mib"]),
             "runtime_on_other_hardware_is_unvalidated": True,
@@ -366,12 +456,20 @@ def serve(args):
                 metadata.get("exllama_commit") == read_json(ROOT / "runtime.json")["tested_exllamav3_commit"]),
         })
         env = dict(os.environ)
-        env.update({"CUDA_VISIBLE_DEVICES": str(gpu_index()), "EXL3_EMBED_TABLE_CUDA": "1",
+        env.update({"CUDA_VISIBLE_DEVICES": str(gpu_index()),
+                    "EXL3_EMBED_TABLE_CUDA": "0" if host_embedding else "1",
                     "EXL3_GRAPHS": "0", "EXL3_QT_OPTIMIZED": "1",
                     "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1",
                     "TOKENIZERS_PARALLELISM": "false", "OMP_NUM_THREADS": "8",
                     "PYTHONPATH": str(exl) + os.pathsep + str(tabby) + os.pathsep + env.get("PYTHONPATH", "")})
+        # EXL3/Torch on WSL reported unexplained CUDA errors at 1024 FDs.
+        # Increase *only this process and children*, never global OS limits.
+        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+        if hard < 65536:
+            raise RuntimeError("Need 65536 open-file hard limit for safe EXL3 load")
+        resource.setrlimit(resource.RLIMIT_NOFILE, (max(soft, 65536), hard))
         logpath = run / "tabby.log"
+        print(f"Memory preflight: {budget}", flush=True)
         print(f"Launching ONLY owned TabbyAPI process, profile={args.profile}, "
               f"GPU_INDEX={gpu_index()}, GPU cutoff="
               f"{gpu_memory_limit_mib(gpu_info()['total_mib'])} MiB.")

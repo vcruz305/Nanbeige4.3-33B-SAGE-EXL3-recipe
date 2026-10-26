@@ -16,8 +16,12 @@ child process group on a safety breach.
   original campaign's stricter host-memory and disk headroom floors
 - Default API: http://127.0.0.1:8898/v1
 
-GPU model, VRAM total and selected index are recorded in the private
-local runtime receipt. The model still requires ~18.35 GiB of weights
+GPU model, VRAM total and selected index, input-embedding residency,
+and a **conservative KV/model VRAM preflight estimate** are recorded in
+the private local runtime receipt. The preflight blocks likely-OOM
+configurations (including 256K Q2 on a 24 GB RTX 4090) before any new
+GPU process is started. Actual runtime memory is still monitored every
+10 seconds and only the owned process group may be terminated. The model still requires ~18.35 GiB of weights
 plus runtime overhead and a KV cache on **one** selected GPU; multi-GPU
 memory pooling, CPU offload and non-NVIDIA backends are not configured.
 

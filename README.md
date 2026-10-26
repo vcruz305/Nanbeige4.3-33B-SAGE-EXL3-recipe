@@ -145,13 +145,23 @@ a fresh installation. No setup command touches a live runtime or starts GPU work
 | `long` (default) | **36,864** | **Q4** | 1 | **Full Sixcat measured on RTX 4090** |
 | `short` | 16,384 | Q8 | 1 | Separate **RTX 4090** smoke; not enough for long thinking-enabled Sixcat Code |
 | `compact` | 8,192 | Q4 | 1 | **Untested capacity option** for other GPUs; may still fail if VRAM is insufficient |
+| **`extended`** | **131,072** | **Q2 K/V (2,2)** | 1 | **3/3 actual long-prompt retrieval smoke on RTX 4090, host input embedding**; not Sixcat |
 
-Select profiles using `PROFILE=compact bash exllamav3-tabby/serve.sh` or
-`PROFILE=long`. On hardware with different memory budgets, change
-`MAX_SEQ_LEN`, `CACHE_SIZE`, and `CACHE_MODE` (`FP16`/`Q8`/`Q6`/`Q4`) for
-**new unvalidated deployments** (e.g. `MAX_SEQ_LEN=65536 CACHE_MODE=Q8`).
-The script requires KV cache size ≥ context and a multiple of 256 tokens.
-These overrides **do not inherit** the measured 4090 speed, fit, or score.
+Run `PROFILE=extended bash exllamav3-tabby/serve.sh` for the newly
+validated **128K smoke-test configuration** on compatible hardware. It
+uses CPU/system RAM for *only the quantized input embedding*; the dense
+4.50-bpw decoder and 2-bit KV cache still run on the GPU. This reduces
+VRAM at the expense of some host-transfer overhead.
+
+Other presets include `PROFILE=compact` and `PROFILE=long`. Override
+`MAX_SEQ_LEN`, `CACHE_SIZE`, `CACHE_MODE` (`FP16`, `Q2`/`Q3`/`Q4`/`Q6`/`Q8`
+or native per-key/value `2,2`/`3,3` patterns) and
+`EMBEDDING_PLACEMENT=cpu` / `gpu` to experiment on other systems.
+The script requires the cache to cover context and sizes it in 256-token
+pages. A new conservative **VRAM capacity preflight** refuses memory
+configurations that are predicted to violate the per-GPU safety ceiling;
+it does not claim all settings that pass a prediction are verified.
+Other GPUs or settings **do not inherit** the RTX 4090 results.
 
 `GPU_INDEX=1` selects the second installed NVIDIA GPU on a multi-GPU host
 (the script uses exactly that device, not all GPUs). `MODEL_DIR` overrides
@@ -178,6 +188,47 @@ All **54 safetensors weights remain identical** to the qualified model.
 The updated Hub revision and SHA-256 are pinned in
 [`model.lock.json`](model.lock.json), and an exact copy of the public
 [`config.json`](evidence/config.json) is committed as a regression fixture.
+
+## Extended context and DFlash2 experiments (RTX 4090)
+
+The original **36,864-token Q4 KV** context was the configuration used
+for the published full strict Sixcat score. Additional actual single-RTX4090
+**long-prompt retrieval smoke tests** have since passed, without changing
+the 4.50-bpw weights:
+
+| Configured context | KV bits (K/V) | Actual prompt tokens | Retrieval markers | Peak VRAM |
+|---|---|---:|---:|---:|
+| **53,248** | **4/4** | 52,728 | **3/3** | 23,120 MiB |
+| **65,536** | **3/3** | 65,004 | **3/3** | 22,980 MiB |
+| **81,920** | **2/2** | 81,405 | **3/3** | 22,680 MiB |
+| **131,072** | **2/2, embedding on CPU** | **130,542** | **3/3** | **23,220 MiB** |
+
+All four used one RTX 4090, a real full-length prompt prefill followed by
+a generated answer, and the original **23,950 MiB** safety cutoff. The
+128K test kept the 8-bit input embedding on **system RAM** while leaving
+the EXL3 decoder on the GPU. These are **synthetic retrieval smoke tests,
+not full Sixcat scores**. Lower-bit KV precision may reduce reasoning
+quality compared with Q4/Q8, so 128K should not be advertised as fully
+quality-qualified. Other GPU capacities require independent testing.
+
+**256K on the RTX 4090:** a 261,619-token prompt was prepared, but the
+262,144-token Q2 K/V cache would require **8,320 MiB**. Even with the
+input embedding offloaded to RAM, memory preflight estimated **27,576
+MiB total VRAM** versus a **23,950 MiB safety cap** and correctly **refused
+to start the GPU model**. **256K has NOT been run or validated.** A larger
+GPU or true model/KV offloading is required; just increasing the context
+number cannot make 256K fit. The model's metadata 512K limit remains
+unverified for this EXL3 quantization.
+
+See the [detailed context-test evidence and reproducible settings](bench/context/README.md).
+
+The independent [DFlash2 draft-model test](bench/dflash2/README.md)
+using [ProCreations' native ExLlamaV3 DFlash2 draft](https://huggingface.co/ProCreations/Nanbeige4.3-33B-DFlash2/tree/exllamav3)
+measured **1.20×** and **1.25×** decoding speedups on short coding/agentic
+prompts (Q4 target KV, 8K cache), but **greedy output sequences diverged
+from the target-only baseline**. Lossless compatibility is **not proven**;
+DFlash2 remains experimental/opt-in and was **not used** in the Sixcat
+score or the extended-context tests.
 
 ## Quality against BF16 source
 
@@ -247,7 +298,7 @@ claim of a byte-identical fresh quantization.
 | [`exllamav3-tabby/`](exllamav3-tabby/) | Non-mutating runtime adoption, pinned **public** pack download and foreground owned-process serve |
 | [`model.lock.json`](model.lock.json) | Exact **public** model revision + SHA-256 and size of all 63 release files |
 | [`runtime.json`](runtime.json) | Measured development engine revision, Tabby provenance and runtime limits |
-| [`bench/`](bench/README.md) | Full Sixcat summary, reproducibility flags, valid speed-comparison scope |
+| [`bench/`](bench/README.md) | Full Sixcat, experimental DFlash2 and **53K–128K context** receipts, plus 256K safety-preflight outcome |
 | [`quantization/`](quantization/README.md) | Original v6 SAGE mixed-bit allocation + reproducibility boundary |
 | [`docs/`](docs/installation.md) | Installation, local-only serving, safety and troubleshooting |
 | [`tests/`](tests/test_recipe.py) | CPU-only manifest/config/methodology validation |

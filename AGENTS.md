@@ -19,3 +19,13 @@
 - Test changes CPU-only first: `python3 -m unittest discover -s tests -v`,
   `bash -n` on all scripts and `DRY_RUN=1 bash exllamav3-tabby/serve.sh`.
   New GPU results need their own receipts, not recycled RTX 4090 benchmarks.
+
+- 128K/Q2 on a 24GB RTX 4090 is a verified synthetic long-prompt
+  retrieval **smoke test** only, with CPU-resident input embedding and
+  23,220 MiB peak VRAM. Do not claim 128K Sixcat or Q2 quality parity.
+- A 256K/Q2 attempt was rejected by memory preflight at an estimated
+  27,576 MiB; **no 256K decoding was performed**. Never bypass the
+  GPU cap or imply that 256K worked on this 4090.
+- Experimental ProCreations DFlash2 trials showed 1.20-1.25x faster
+  short decoding but **divergent greedy token sequences**. Do not
+  enable draft by default or assert lossless equivalence without repair.

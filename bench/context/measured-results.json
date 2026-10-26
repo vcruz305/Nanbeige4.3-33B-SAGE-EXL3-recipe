@@ -1,0 +1,90 @@
+{
+  "schema": "nanbeige.sage_exl3.single_rtx4090.extended_context.v1",
+  "date": "2026-10-26",
+  "model": "vcruz305/Nanbeige4.3-33B-SAGE-EXL3-4.50bpw",
+  "model_weights_unchanged": true,
+  "validated_cases": [
+    {
+      "context_capacity_tokens": 53248,
+      "actual_input_tokens": 52728,
+      "kv_format": "Q4 K / Q4 V",
+      "embedding_location": "GPU / resident",
+      "gpu_model": "NVIDIA RTX 4090 24GB",
+      "gpu_peak_used_mib": 23120,
+      "safety_cutoff_mib": 23950,
+      "real_completion_returned": true,
+      "synthetic_needle_count_passed": 3,
+      "synthetic_needle_count_total": 3,
+      "full_model_sixcat_scored": false,
+      "weights_reencoded": false,
+      "context_is_not_512k_quality_claim": true,
+      "response_time_seconds": 48.315
+    },
+    {
+      "context_capacity_tokens": 65536,
+      "actual_input_tokens": 65004,
+      "kv_format": "Q3 K / Q3 V",
+      "embedding_location": "GPU / resident",
+      "gpu_model": "NVIDIA RTX 4090 24GB",
+      "gpu_peak_used_mib": 22980,
+      "safety_cutoff_mib": 23950,
+      "real_completion_returned": true,
+      "synthetic_needle_count_passed": 3,
+      "synthetic_needle_count_total": 3,
+      "full_model_sixcat_scored": false,
+      "weights_reencoded": false,
+      "context_is_not_512k_quality_claim": true,
+      "response_time_seconds": 62.321
+    },
+    {
+      "context_capacity_tokens": 81920,
+      "actual_input_tokens": 81405,
+      "kv_format": "Q2 K / Q2 V",
+      "embedding_location": "GPU / resident",
+      "gpu_model": "NVIDIA RTX 4090 24GB",
+      "gpu_peak_used_mib": 22680,
+      "safety_cutoff_mib": 23950,
+      "real_completion_returned": true,
+      "synthetic_needle_count_passed": 3,
+      "synthetic_needle_count_total": 3,
+      "full_model_sixcat_scored": false,
+      "weights_reencoded": false,
+      "context_is_not_512k_quality_claim": true,
+      "response_time_seconds": 83.327
+    },
+    {
+      "context_capacity_tokens": 131072,
+      "actual_input_tokens": 130542,
+      "kv_format": "Q2 K / Q2 V",
+      "embedding_location": "CPU / system RAM",
+      "gpu_model": "NVIDIA RTX 4090 24GB",
+      "gpu_peak_used_mib": 23220,
+      "safety_cutoff_mib": 23950,
+      "real_completion_returned": true,
+      "synthetic_needle_count_passed": 3,
+      "synthetic_needle_count_total": 3,
+      "full_model_sixcat_scored": false,
+      "weights_reencoded": false,
+      "context_is_not_512k_quality_claim": true,
+      "response_time_seconds": 161.055
+    }
+  ],
+  "256k_attempt": {
+    "context_capacity_tokens": 262144,
+    "actual_prompt_prepared_tokens": 261619,
+    "kv_format": "Q2 K / Q2 V",
+    "kv_cache_mib": 8320.0,
+    "cpu_embedding_requested": true,
+    "estimated_gpu_peak_mib": 27576,
+    "gpu_vram_safety_cutoff_mib": 23950,
+    "gpu_server_launched": false,
+    "reason": "Safety preflight rejected 256K; estimated VRAM 27,576 MiB exceeds the 23,950 MiB cutoff. No 256K decode or runtime fit was measured.",
+    "next_requirement": "Model weight offload, KV offload, another suitably sized GPU or a smaller quantization; not available under this recipe on one 24GB 4090."
+  },
+  "comparison_caveats": [
+    "These are one-shot synthetic multi-depth retrieval smoke tests; no 128K Sixcat benchmark or general-purpose long-context quality claim.",
+    "Q2/Q3 KV quantization can change output quality relative to Q4/Q8, not independently audited beyond synthetic retrieval.",
+    "CPU input embedding placement on 128K reduces GPU VRAM use and introduces CPU/GPU transfer overhead.",
+    "36K Q4 context remains the only configuration used for the published 120-question Sixcat score."
+  ]
+}

@@ -13,6 +13,9 @@
 | QAD per-layer looks better, global metrics worse | Keep original v6 pack. Experimental full-residual QAD was rejected |
 | Runtime sees busy selected GPU | Choose a different `GPU_INDEX`, or do not start. Never kill unrelated jobs |
 | HF "Configuration Parsing Warning: quantization_config.bits must be an integer" | Fixed in public config revision `32ec2b7`: the top-level `config.json` omits fractional `bits`, but EXL3-native `quantization_config.json` retains nominal `bits: 4.5` and per-tensor metadata. Upgrade the local `config.json` without replacing weight shards. |
+| 128K Q2 seems to exceed GPU memory | Use `PROFILE=extended` to move only the quantized input embedding to **system RAM**, leaving the decoder weights unchanged; the tested 128K run peaked at 23,220 MiB with 3/3 synthetic retrieval markers. |
+| 256K fails context capacity preflight on RTX 4090 | The 262,144-token Q2 K/V cache needs 8,320 MiB; 27,576 MiB projected GPU usage exceeds the 23,950 MiB safety cap. This is a **safe refusal**, not a 256K successful run. |
+| CUDA driver error: unknown error during WSL2 ExLlama load | An older test launcher inherited only 1,024 file descriptors. The recipe now raises the owned server's soft limit to **65,536**, matching the successful long-context load. |
 
 If the selected GPU does not have enough VRAM for the 18.35-GiB
 weights plus runtime/KV buffers, the single-device runner will refuse

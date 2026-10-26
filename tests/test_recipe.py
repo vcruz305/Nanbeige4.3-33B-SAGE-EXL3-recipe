@@ -23,7 +23,7 @@ class ManifestTests(unittest.TestCase):
         self.assertTrue(lock["initial_private_staging"])
         self.assertEqual(lock["current_visibility"], "public")
         self.assertFalse(lock["gated"])
-        self.assertEqual(lock["revision"], "32ec2b745dc3f4aa0d2bef84bb97f612e384df23")
+        self.assertEqual(lock["revision"], "e4bf35566476daf25fdf650947d10553c1af985c")
 
     def test_checksum_helper(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -87,6 +87,74 @@ class ManifestTests(unittest.TestCase):
              mock.patch.object(recipe.shutil, "disk_usage", return_value=mock.Mock(free=50 * 1024**3)):
             with self.assertRaisesRegex(RuntimeError, "cannot fit the 18.35 GiB weights"):
                 recipe.safe_resources(before_load=True)
+
+    def test_measured_128k_q2_profile_and_256k_preflight(self):
+        # Actual RTX4090 128K result: host-placed input embedding, GPU
+        # resident original decoder weights and 2-bit K/V.
+        cfg = recipe.config("extended", env={})
+        self.assertEqual(cfg["model"]["max_seq_len"], 131072)
+        self.assertEqual(cfg["model"]["cache_size"], 131072)
+        self.assertEqual(cfg["model"]["cache_mode"], "2,2")
+        self.assertTrue(recipe.cpu_embedding_enabled("extended", env={}))
+        self.assertEqual(recipe.kv_storage_mib(cfg), 4160.0)
+        safe = recipe.gpu_vram_budget(
+            cfg, cpu_embedding=True, weight_bytes=19700587306,
+            total_mib=24564, used_mib=214)
+        self.assertGreaterEqual(safe["estimated_headroom_mib"], 300)
+        self.assertEqual(safe["gpu_limit_mib"], 23949)
+        # The original 23,950MiB cutoff is not relaxed to squeeze 256K.
+        too_big = recipe.config("extended", env={
+            "MAX_SEQ_LEN": "262144", "CACHE_SIZE": "262144", "CACHE_MODE": "Q2"})
+        self.assertEqual(recipe.kv_storage_mib(too_big), 8320.0)
+        with self.assertRaisesRegex(RuntimeError, "Safe context budget exceeded"):
+            recipe.gpu_vram_budget(too_big, cpu_embedding=True,
+                                  weight_bytes=19700587306, total_mib=24564)
+        # More-capable GPUs can configure 256K; not claimed tested.
+        larger = recipe.gpu_vram_budget(too_big, cpu_embedding=True,
+                                       weight_bytes=19700587306, total_mib=81920)
+        self.assertGreater(larger["estimated_headroom_mib"], 10000)
+        q3 = recipe.config("long", env={"MAX_SEQ_LEN":"65536", "CACHE_MODE":"Q3"})
+        self.assertEqual(q3["model"]["cache_mode"], "3,3")
+        self.assertEqual(recipe.kv_storage_mib(q3), 2912.0)
+        self.assertFalse(recipe.cpu_embedding_enabled("long", env={}))
+        self.assertTrue(recipe.cpu_embedding_enabled("long", env={"EMBEDDING_PLACEMENT":"cpu"}))
+        with self.assertRaises(ValueError):
+            recipe.cpu_embedding_enabled("long", env={"EMBEDDING_PLACEMENT":"cloud"})
+
+    def test_release_native_quant_metadata_accepts_hf_fix(self):
+        config = json.loads((ROOT / "evidence" / "config.json").read_text())
+        top = config["quantization_config"]
+        self.assertNotIn("bits", top)
+        native = {"quant_method":"exl3", "codebook":"mul1", "bits":4.5,
+                  "head_bits":8, "tensor_storage":{"example":{"trellis":True}}}
+        self.assertTrue(recipe.validate_exl3_quant_metadata(top, native))
+        legacy = {**top, "bits":4.5}
+        self.assertTrue(recipe.validate_exl3_quant_metadata(legacy, native))
+        with self.assertRaises(ValueError):
+            recipe.validate_exl3_quant_metadata({**top, "bits":4}, native)
+        with self.assertRaises(ValueError):
+            recipe.validate_exl3_quant_metadata(top, {**native, "bits":4})
+
+    def test_public_context_smoke_receipts_honest(self):
+        data=json.loads((ROOT / "bench/context/measured-results.json").read_text())
+        tested=data["validated_cases"]
+        self.assertEqual([case["context_capacity_tokens"] for case in tested],
+                         [53248, 65536, 81920, 131072])
+        self.assertTrue(all(case["synthetic_needle_count_passed"]==3 for case in tested))
+        self.assertTrue(all(case["gpu_peak_used_mib"]<23950 for case in tested))
+        self.assertFalse(any(case["full_model_sixcat_scored"] for case in tested))
+        last=tested[-1]
+        self.assertEqual(last["embedding_location"], "CPU / system RAM")
+        self.assertEqual(last["actual_input_tokens"], 130542)
+        self.assertEqual(last["gpu_peak_used_mib"], 23220)
+        attempt=data["256k_attempt"]
+        self.assertEqual(attempt["context_capacity_tokens"],262144)
+        self.assertEqual(attempt["kv_cache_mib"],8320)
+        self.assertEqual(attempt["estimated_gpu_peak_mib"],27576)
+        self.assertFalse(attempt["gpu_server_launched"])
+        trial=json.loads((ROOT / "bench/dflash2/measured-results.json").read_text())
+        self.assertFalse(trial["all_greedy_match"])
+        self.assertEqual(trial["status"],"COMPLETE")
 
     def test_benchmark_receipts(self):
         scores = json.loads((ROOT / "bench" / "measured-results.json").read_text())

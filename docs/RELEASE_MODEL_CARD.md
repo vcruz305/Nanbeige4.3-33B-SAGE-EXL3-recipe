@@ -144,6 +144,52 @@ All **120 first responses** were scored under **strict policy**, 20 per category
 
 An isolated **vLLM 0.32.0 + custom EXL3 plugin** was able to load and decode the same pack with 36K INT4 KV, but an experimental ~6.84 tok/s SSE probe used a different workload/timing method. It does **not** establish an apples-to-apples engine speed ratio, and no full vLLM Sixcat score is claimed. **ExLlamaV3 + TabbyAPI is the qualified operational choice** for the measured setup.
 
+## Additional RTX 4090 context tests (after the scored 36K release)
+
+These are **long-prompt synthetic retrieval smoke tests**, not
+higher-context Sixcat scores. The original SAGE-EXL3 model weights were
+unchanged. Each successful run actually prefilled a nearly full native
+chat-template prompt and returned the correct three synthetic markers:
+
+| Configured context | Actual prompt | K/V cache | Input embedding | Peak VRAM | Synthetic retrieval |
+|---:|---:|---|---|---:|---:|
+| 53,248 | 52,728 | Q4/Q4 | GPU | 23,120 MiB | 3/3 |
+| 65,536 | 65,004 | Q3/Q3 | GPU | 22,980 MiB | 3/3 |
+| 81,920 | 81,405 | Q2/Q2 | GPU | 22,680 MiB | 3/3 |
+| **131,072** | **130,542** | **Q2/Q2** | **CPU/system RAM** | **23,220 MiB** | **3/3** |
+
+The **128K** configuration uses the original EXL3 weights and offloads
+only the **packed 8-bit input embedding** to system RAM, while keeping the
+decoder-body weights and Q2 K/V cache on the RTX 4090. The full-length
+128K request took **161.055 seconds** and completed without safety events
+under a **23,950 MiB** VRAM cutoff. Lower-bit KV and host embedding
+placement may affect performance and accuracy; no 128K Sixcat or
+full-corpus long-context fidelity result is claimed.
+
+**256K safety outcome:** a 261,619-token prompt was prepared for a
+262,144-token Q2/Q2 configuration. Its cache would require **8,320 MiB**,
+and projected total VRAM with the host embedding was **27,576 MiB**,
+above the safety cap. The preflight **refused GPU launch**. There was
+**no 256K inference run** or verified capacity on the RTX 4090.
+Reaching 256K with this model requires additional CPU/model/KV offload
+support or a larger-memory GPU. See the complete
+[context receipts and limitations](https://github.com/vcruz305/Nanbeige4.3-33B-SAGE-EXL3-recipe/tree/main/bench/context).
+
+### DFlash2 draft — experimental short-speed comparison
+
+The native
+[ProCreations Nanbeige4.3-33B DFlash2](https://huggingface.co/ProCreations/Nanbeige4.3-33B-DFlash2/tree/exllamav3)
+draft was loaded with **this exact 4.50-bpw pack** on RTX 4090 at **8K Q4
+target KV**. It reached **42.81 tok/s coding** versus 35.58 plain
+(**1.20×**) and **44.30 tok/s agentic** versus 35.57 plain (**1.25×**)
+on two short 192-output-token samples. However, the greedy token streams
+**diverged** from the no-draft baseline at tokens 113 and 66, so **lossless
+output equivalence is not proven** and draft inference is not enabled by
+default in the public recipe. These short tests do **not** prove DFlash2
+performance or correctness at 128K. The full 120-question Sixcat score
+was recorded with **no draft**. See the
+[experimental DFlash2 report](https://github.com/vcruz305/Nanbeige4.3-33B-SAGE-EXL3-recipe/tree/main/bench/dflash2).
+
 ## Limits, license and credits
 
 - Original Nanbeige model config advertises **512K context**. The largest *completed scored* context for this quant was **36,864 tokens** on RTX 4090. Do not extrapolate to 512K on a 24 GB GPU.

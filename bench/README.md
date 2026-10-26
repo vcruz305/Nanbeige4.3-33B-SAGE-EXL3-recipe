@@ -46,3 +46,12 @@ the result is **not directly comparable to fully untruncated runs**.
 These have different request sets and timing methods, so the engine
 choice is operational, **not a controlled like-for-like speed ratio**.
 A full vLLM Sixcat evaluation was not performed.
+
+## Subsequent experiments
+
+[Extended context results](context/README.md)
+(**53K/Q4**, **65K/Q3**, **81K/Q2** and **128K/Q2 with CPU embedding**)
+are measured **synthetic retrieval smoke tests**, not full Sixcat scores.
+The **256K/Q2 attempt was refused by GPU memory preflight**, not a runtime
+success. [DFlash2](dflash2/README.md) produced faster short decoding but
+divergent greedy token sequences, so it is not enabled by default.
